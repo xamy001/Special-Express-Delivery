@@ -1,42 +1,55 @@
-import shipments from "./shipment";
+// src/tracking.js
 
-const TRACKING_DURATION_HOURS = 30;
-const HOUR = 60 * 60 * 1000;
-
-export function getShipmentStatus(registeredAt) {
-  const elapsedHours = (Date.now() - registeredAt) / HOUR;
-
-  if (elapsedHours < 1) {
-    return { stage: 0, status: "Registered" };
+const shipments = [
+  {
+    trackingNumber: "6624",
+    origin: "Manchester, England 🇬🇧",
+    destination: "Bogota, Colombia 🇨🇴",
+    registrationTime: "2026-10-14T11:00:00",
+    estimatedArrival: "2026-10-15T19:00:00", // Exactly 32 hours total transit
+    sender: "Maurice Abba El Doroyii",
+    receiver: "Shirley Guerrero Martinez",
+    date: "14/10/2026",
+    notes: "Transatlantic Air Cargo — Direct Transit to Bogota, Colombia."
   }
+];
 
-  if (elapsedHours < 6) {
-    return { stage: 1, status: "Dispatched" };
-  }
-
-  if (elapsedHours < TRACKING_DURATION_HOURS) {
-    return { stage: 2, status: "In Transit" };
-  }
-
-  return {
-    stage: 3,
-    status: "Arrived in Destination Country",
-  };
-}
-
-export function findShipment(trackingNumber) {
-  const normalizedNumber = trackingNumber.trim().toUpperCase();
-
-  const shipment = shipments.find(
-    (item) => item.trackingNumber.toUpperCase() === normalizedNumber
-  );
-
+export function findShipment(number) {
+  const shipment = shipments.find((s) => s.trackingNumber === number);
   if (!shipment) return null;
+
+  const now = new Date();
+  const regTime = new Date(shipment.registrationTime);
+  const arrivalTime = new Date(shipment.estimatedArrival);
+
+  let stage = 0;
+  let status = "Registered";
+
+  // Calculate stage progress automatically based on real time:
+  // Stage 0: Registered
+  // Stage 1: Dispatched (starts 3 hours after registration)
+  // Stage 2: In Transit (starts 6 hours after registration)
+  // Stage 3: Arrived in destination country (locked permanently after 32 hours)
+
+  const hoursElapsed = (now - regTime) / (1000 * 60 * 60);
+
+  if (now >= arrivalTime) {
+    stage = 3;
+    status = "Arrived in destination country";
+  } else if (hoursElapsed >= 6) {
+    stage = 2;
+    status = "In Transit";
+  } else if (hoursElapsed >= 3) {
+    stage = 1;
+    status = "Dispatched";
+  } else {
+    stage = 0;
+    status = "Registered";
+  }
 
   return {
     ...shipment,
-    ...getShipmentStatus(shipment.registeredAt),
-    estimatedArrival:
-      shipment.registeredAt + TRACKING_DURATION_HOURS * HOUR,
+    stage,
+    status,
   };
 }
